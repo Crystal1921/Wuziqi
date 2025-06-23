@@ -38,10 +38,15 @@ public class PrepareMatchScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.drawCenteredString(font, WUZIQI, this.width / 2, 20, 0xFFFFFF);
-        graphics.fill(queuedPlayers.getRowLeft(), queuedPlayers.getBottom() - queuedPlayers.getHeight(), queuedPlayers.getRight(), queuedPlayers.getBottom(), 0xE0101010);// background for queuedPlayers
-        renderBackground(graphics,mouseX,mouseY,partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
+        graphics.drawCenteredString(font, WUZIQI, this.width / 2, 20, 0xFFFFFF);
+    }
+
+    @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        super.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.fill(queuedPlayers.getRowLeft(), queuedPlayers.getBottom() - queuedPlayers.getHeight(), queuedPlayers.getRight(), queuedPlayers.getBottom(), 0xE0101010);// background for queuedPlayers
+
     }
 
     @Override
