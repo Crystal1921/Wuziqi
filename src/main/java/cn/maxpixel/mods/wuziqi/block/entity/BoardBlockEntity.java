@@ -3,9 +3,13 @@ package cn.maxpixel.mods.wuziqi.block.entity;
 import cn.maxpixel.mods.wuziqi.annotations.UsedOn;
 import cn.maxpixel.mods.wuziqi.board.Board;
 import cn.maxpixel.mods.wuziqi.board.PieceType;
+import cn.maxpixel.mods.wuziqi.gomoku.AIService;
+import cn.maxpixel.mods.wuziqi.gomoku.Point;
+import cn.maxpixel.mods.wuziqi.gomoku.ZhiZhangAIService;
 import cn.maxpixel.mods.wuziqi.network.clientbound.UpdatePlayersPacket;
 import cn.maxpixel.mods.wuziqi.registry.BlockEntityRegistry;
 import cn.maxpixel.mods.wuziqi.util.I18nUtil;
+import com.mojang.authlib.GameProfile;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.core.BlockPos;
@@ -23,13 +27,11 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class BoardBlockEntity extends BlockEntity {
@@ -50,6 +52,10 @@ public class BoardBlockEntity extends BlockEntity {
     private transient @Nullable PieceType turn;
     private transient @Nullable Set<Player> white;
     private transient @Nullable Set<Player> black;
+    private final transient UUID randomUUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
+    private transient @Nullable FakePlayer fakePlayer;
+
+    public static final AIService EASY = new ZhiZhangAIService(new AIService.AIConfig(1, 10, false, 0, 6));
 
     public BoardBlockEntity(BlockPos pos, BlockState state) {
         super(BlockEntityRegistry.BOARD.get(), pos, state);
@@ -121,14 +127,17 @@ public class BoardBlockEntity extends BlockEntity {
         board = null;
         setMatching(false);
         matchJustEnded = true;
-        level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        fakePlayer = null;
+        if (level != null) {
+            level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
     }
 
     private void dividePlayers() {
         if (joinedPlayers.size() == 1) {
             var p = joinedPlayers.iterator().next();
-            addToWhite(p);
             addToBlack(p);
+            addToFakePlayer();
         } else {
             Random r = new Random();
             var joinedPlayers = new ObjectArrayList<>(this.joinedPlayers);
@@ -153,6 +162,14 @@ public class BoardBlockEntity extends BlockEntity {
         black.add(p);
     }
 
+    private void addToFakePlayer() {
+        if (white == null) this.white = new ObjectOpenHashSet<>();
+        if (level instanceof ServerLevel serverLevel) {
+            fakePlayer = new FakePlayer(serverLevel, new GameProfile(randomUUID, "WuziqiFakePlayer"));
+            white.add(fakePlayer);
+        }
+    }
+
     public void nextTurn() {
         if (turn == null) turn = PieceType.BLACK;
         else turn = turn == PieceType.BLACK ? PieceType.WHITE : PieceType.BLACK;
@@ -165,18 +182,34 @@ public class BoardBlockEntity extends BlockEntity {
 
     @UsedOn(UsedOn.Side.SERVER)
     public void placePiece(Player p, byte x, byte z) {
-        if (isMatching() && isTurnFor(p) && getBoard().putPiece(x, z, turn)) {
-            if (getBoard().checkWin(x, z)) {
-                if (turn == PieceType.WHITE) {
-                    joinedPlayers.forEach(player -> player.connection.send(new ClientboundSetTitleTextPacket(WHITE_WIN)));
-                } else {
-                    joinedPlayers.forEach(player -> player.connection.send(new ClientboundSetTitleTextPacket(BLACK_WIN)));
-                }
-                endMatch();
-                return;
+        if (fakePlayer != null) {
+            if (isMatching() && isTurnFor(p) && getBoard().putPiece(x, z, PieceType.BLACK)) {
+                if (checkWin(x, z)) return;
+                nextTurn();
+                Point point = EASY.getPoint(getBoard().getPieces(), new Point(x, z, Point.BLACK));
+                getBoard().putPiece(point.x, point.y, PieceType.WHITE);
+                checkWin((byte) point.x, (byte) point.y);
+                nextTurn();
             }
-            nextTurn();
+        } else {
+            if (isMatching() && isTurnFor(p) && getBoard().putPiece(x, z, turn)) {
+                if (checkWin(x, z)) return;
+                nextTurn();
+            }
         }
+    }
+
+    private boolean checkWin(byte x, byte z) {
+        if (getBoard().checkWin(x, z)) {
+            if (turn == PieceType.WHITE) {
+                joinedPlayers.forEach(player -> player.connection.send(new ClientboundSetTitleTextPacket(WHITE_WIN)));
+            } else {
+                joinedPlayers.forEach(player -> player.connection.send(new ClientboundSetTitleTextPacket(BLACK_WIN)));
+            }
+            endMatch();
+            return true;
+        }
+        return false;
     }
 
     @Override

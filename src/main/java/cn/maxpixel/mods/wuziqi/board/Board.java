@@ -113,6 +113,16 @@ public class Board {
         return tag;
     }
 
+    public byte[][] getPieces() {
+        byte[][] arr = new byte[BOARD_SIZE][BOARD_SIZE];
+        for (int x = 0; x < BOARD_SIZE; x++) {
+            for (int y = 0; y < BOARD_SIZE; y++) {
+                arr[x][y] = pieces[x][y] == null ? 0 : pieces[x][y].code;
+            }
+        }
+        return arr;
+    }
+
     public static Board load(Runnable setChanged, CompoundTag tag) {
         PieceType[][] pieces = new PieceType[BOARD_SIZE][BOARD_SIZE];
         if (tag.contains(PIECES_KEY, Tag.TAG_BYTE_ARRAY)) {
