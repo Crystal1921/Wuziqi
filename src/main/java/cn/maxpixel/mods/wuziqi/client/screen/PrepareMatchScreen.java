@@ -3,9 +3,11 @@ package cn.maxpixel.mods.wuziqi.client.screen;
 import cn.maxpixel.mods.wuziqi.block.entity.BoardBlockEntity;
 import cn.maxpixel.mods.wuziqi.network.serverbound.PrepareMatchPacket;
 import cn.maxpixel.mods.wuziqi.util.I18nUtil;
+import com.google.common.collect.ImmutableList;
 import net.minecraft.client.GameNarrator;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.network.chat.Component;
@@ -28,6 +30,7 @@ public class PrepareMatchScreen extends Screen {
     private PlayerSelectionList queuedPlayers;
     private Button toggleJoin;
     private Button startMatch;
+    private CycleButton difficultyButton;
 
     private boolean joined;
 
@@ -65,29 +68,35 @@ public class PrepareMatchScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        PacketDistributor.sendToServer(new PrepareMatchPacket(PrepareMatchPacket.Action.SYNC, blockEntity.getBlockPos()));
+        this.difficultyButton = CycleButton.<BoardBlockEntity.Difficulty>builder((serializedName) -> Component.translatable("screen.wuziqi.prepare_match." + serializedName.name().toLowerCase()))
+                .withValues(ImmutableList.copyOf(BoardBlockEntity.Difficulty.values()))
+                .displayOnlyValue()
+                .withInitialValue(blockEntity.getDifficulty())
+                .create(this.width / 2 - 143, 16, 100, 25, Component.literal("MODE"), (cycleButton, difficulty) -> updateMode(difficulty));
+        PacketDistributor.sendToServer(new PrepareMatchPacket(PrepareMatchPacket.Action.SYNC, (BoardBlockEntity.Difficulty) difficultyButton.getValue(), blockEntity.getBlockPos()));
         this.queuedPlayers = new PlayerSelectionList(minecraft, WIDTH, 80, 40, 160, 20);
         queuedPlayers.setPosition(width / 2 - WIDTH / 2,40);
         queuedPlayers.setRenderHeader(true, 20);
         addRenderableWidget(queuedPlayers);
 
+        this.addRenderableWidget(difficultyButton);
+
         this.toggleJoin = Button.builder(JOIN, button -> {
             if (joined) {
-                joined = false;
-                PacketDistributor.sendToServer(new PrepareMatchPacket(PrepareMatchPacket.Action.QUIT, blockEntity.getBlockPos()));
+                updateJoin(false, PrepareMatchPacket.Action.QUIT);
             } else {
-                joined = true;
-                PacketDistributor.sendToServer(new PrepareMatchPacket(PrepareMatchPacket.Action.JOIN, blockEntity.getBlockPos()));
+                updateJoin(true, PrepareMatchPacket.Action.JOIN);
             }
         }).pos(width / 2 - 150 - 1, 170).build();
         addRenderableWidget(toggleJoin);
 
         this.startMatch = Button.builder(START, button -> {
-            PacketDistributor.sendToServer(new PrepareMatchPacket(PrepareMatchPacket.Action.START, blockEntity.getBlockPos()));
+            PacketDistributor.sendToServer(new PrepareMatchPacket(PrepareMatchPacket.Action.START, (BoardBlockEntity.Difficulty) difficultyButton.getValue(), blockEntity.getBlockPos()));
             onClose();
         }).pos(width / 2 + 1, 170).build();
         addRenderableWidget(startMatch);
     }
+
 
     public void setQueuedPlayers(UUID[] players) {
         var list = queuedPlayers.children();
@@ -98,5 +107,16 @@ public class PrepareMatchScreen extends Screen {
                 list.add(queuedPlayers.new Entry(player, minecraft));
             }
         }
+    }
+
+    private void updateJoin(boolean joined, PrepareMatchPacket.Action quit) {
+        this.joined = joined;
+        int size = this.queuedPlayers.children().size();
+        this.difficultyButton.active = (size <= 1);
+        PacketDistributor.sendToServer(new PrepareMatchPacket(quit, (BoardBlockEntity.Difficulty) difficultyButton.getValue(), blockEntity.getBlockPos()));
+    }
+
+    private void updateMode(BoardBlockEntity.Difficulty difficulty) {
+        PacketDistributor.sendToServer(new PrepareMatchPacket(PrepareMatchPacket.Action.SYNC, difficulty, blockEntity.getBlockPos()));
     }
 }

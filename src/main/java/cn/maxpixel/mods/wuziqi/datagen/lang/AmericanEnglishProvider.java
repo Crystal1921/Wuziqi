@@ -30,5 +30,10 @@ public class AmericanEnglishProvider extends AbstractLangProvider {
         addScreen(PrepareMatchScreen.SCREEN, "quit", "Quit");
         addScreen(PrepareMatchScreen.SCREEN, "start", "Start");
         addScreen(PrepareMatchScreen.SCREEN, "start_sp", "Start in singleplayer");
+        addScreen(PrepareMatchScreen.SCREEN, "empty", "Empty");
+        addScreen(PrepareMatchScreen.SCREEN, "easy", "Easy");
+        addScreen(PrepareMatchScreen.SCREEN, "normal", "Normal");
+        addScreen(PrepareMatchScreen.SCREEN, "hard", "Hard");
+        addScreen(PrepareMatchScreen.SCREEN, "lunatic", "Lunatic");
     }
 }

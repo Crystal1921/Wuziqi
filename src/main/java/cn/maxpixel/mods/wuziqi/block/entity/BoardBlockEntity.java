@@ -41,10 +41,13 @@ public class BoardBlockEntity extends BlockEntity {
     public static final String WHITE_KEY = "White";
     public static final String BLACK_KEY = "Black";
     public static final String CLEAR_KEY = "Clear";
+    public static final String DIFFICULTY_KEY = "Difficulty";
     private static final Component WHITE_WIN = Component.translatable(I18nUtil.make("block_entity", "board.win.white"));
     private static final Component BLACK_WIN = Component.translatable(I18nUtil.make("block_entity", "board.win.black"));
+    private static final Difficulty[] DIFFICULTIES = Difficulty.values();
     private final Set<ServerPlayer> joinedPlayers = new ObjectOpenHashSet<>();
     private @Nullable Board board;
+    private Difficulty difficulty = Difficulty.EASY; // Default difficulty
 
     // These are only used at runtime
     private transient @UsedOn(UsedOn.Side.SERVER) boolean matchJustEnded;
@@ -54,8 +57,6 @@ public class BoardBlockEntity extends BlockEntity {
     private transient @Nullable Set<Player> black;
     private final transient UUID randomUUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
     private transient @Nullable FakePlayer fakePlayer;
-
-    public static final AIService EASY = new ZhiZhangAIService(new AIService.AIConfig(1, 10, false, 0, 6));
 
     public BoardBlockEntity(BlockPos pos, BlockState state) {
         super(BlockEntityRegistry.BOARD.get(), pos, state);
@@ -137,7 +138,11 @@ public class BoardBlockEntity extends BlockEntity {
         if (joinedPlayers.size() == 1) {
             var p = joinedPlayers.iterator().next();
             addToBlack(p);
-            addToFakePlayer();
+            if (this.difficulty == Difficulty.EMPTY) {
+                addToWhite(p);
+            } else {
+                addToFakePlayer();
+            }
         } else {
             Random r = new Random();
             var joinedPlayers = new ObjectArrayList<>(this.joinedPlayers);
@@ -182,13 +187,13 @@ public class BoardBlockEntity extends BlockEntity {
 
     @UsedOn(UsedOn.Side.SERVER)
     public void placePiece(Player p, byte x, byte z) {
-        if (fakePlayer != null) {
+        if (fakePlayer != null && difficulty != Difficulty.EMPTY) {
             if (isMatching() && isTurnFor(p) && getBoard().putPiece(x, z, PieceType.BLACK)) {
                 if (checkWin(x, z)) return;
                 nextTurn();
-                Point point = EASY.getPoint(getBoard().getPieces(), new Point(x, z, Point.BLACK));
+                Point point = difficulty.service.getPoint(getBoard().getPieces(), new Point(x, z, Point.BLACK));
                 getBoard().putPiece(point.x, point.y, PieceType.WHITE);
-                checkWin((byte) point.x, (byte) point.y);
+                if (checkWin((byte) point.x, (byte) point.y)) return;
                 nextTurn();
             }
         } else {
@@ -238,6 +243,9 @@ public class BoardBlockEntity extends BlockEntity {
         if (tag.contains(BLACK_KEY, Tag.TAG_COMPOUND)) {
             this.black = getPlayerList(tag, BLACK_KEY);
         }
+        if (tag.contains(DIFFICULTY_KEY, Tag.TAG_BYTE)) {
+            this.difficulty = DIFFICULTIES[Math.min(tag.getByte(DIFFICULTY_KEY), DIFFICULTIES.length - 1)];
+        }
     }
 
     @Override
@@ -246,6 +254,7 @@ public class BoardBlockEntity extends BlockEntity {
         if (board != null) {
             tag.put(BOARD_KEY, board.save());
         }
+        tag.putByte(DIFFICULTY_KEY, (byte) difficulty.ordinal());
     }
 
     @Nullable
@@ -280,5 +289,27 @@ public class BoardBlockEntity extends BlockEntity {
             if (p != null) list.add(p);
         }
         return list;
+    }
+
+    public void setDifficulty(Difficulty difficulty) {
+        this.difficulty = difficulty;
+    }
+
+    public Difficulty getDifficulty() {
+        return difficulty;
+    }
+
+    public enum Difficulty {
+        EMPTY(null),
+        EASY(new ZhiZhangAIService(new AIService.AIConfig(1, 10, false, 0, 6))),
+        NORMAL(new ZhiZhangAIService(new AIService.AIConfig(4, 10, false, 0, 6))),
+        HARD(new ZhiZhangAIService(new AIService.AIConfig(6, 10, false, 1, 8))),
+        LUNATIC(new ZhiZhangAIService(new AIService.AIConfig(8, 10, false, 1, 10)));
+
+        @Nullable
+        public AIService service;
+        Difficulty(AIService service) {
+            this.service = service;
+        }
     }
 }

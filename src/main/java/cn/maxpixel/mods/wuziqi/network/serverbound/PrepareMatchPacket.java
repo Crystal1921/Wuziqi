@@ -12,11 +12,13 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import static cn.maxpixel.mods.wuziqi.WuziqiMod.rl;
 
-public record PrepareMatchPacket(Action action, BlockPos boardPos) implements CustomPacketPayload {
+public record PrepareMatchPacket(Action action, BoardBlockEntity.Difficulty difficulty, BlockPos boardPos) implements CustomPacketPayload {
     public static final CustomPacketPayload.Type<PrepareMatchPacket> TYPE = new CustomPacketPayload.Type<>(rl("prepare_match"));
     public static final StreamCodec<FriendlyByteBuf, PrepareMatchPacket> STREAM_CODEC = StreamCodec.composite(
             NeoForgeStreamCodecs.enumCodec(Action.class),
             PrepareMatchPacket::action,
+            NeoForgeStreamCodecs.enumCodec(BoardBlockEntity.Difficulty.class),
+            PrepareMatchPacket::difficulty,
             net.minecraft.core.BlockPos.STREAM_CODEC,
             PrepareMatchPacket::boardPos,
             PrepareMatchPacket::new
@@ -27,8 +29,11 @@ public record PrepareMatchPacket(Action action, BlockPos boardPos) implements Cu
             context.enqueueWork(() -> {
                 var sender = (ServerPlayer) context.player();
                 Action action = message.action;
+                BoardBlockEntity.Difficulty difficulty = message.difficulty;
                 BlockPos boardPos = message.boardPos;
                 if (sender.level().getBlockEntity(boardPos) instanceof BoardBlockEntity blockEntity) {
+                    blockEntity.setDifficulty(difficulty);
+                    blockEntity.setChanged();
                     var level = sender.level();
                     switch (action) {
                         case JOIN -> blockEntity.addPlayer(sender);

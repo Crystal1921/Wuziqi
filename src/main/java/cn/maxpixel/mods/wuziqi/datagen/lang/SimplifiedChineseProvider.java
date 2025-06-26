@@ -30,5 +30,10 @@ public class SimplifiedChineseProvider extends AbstractLangProvider {
         addScreen(PrepareMatchScreen.SCREEN, "quit", "退出");
         addScreen(PrepareMatchScreen.SCREEN, "start", "开始");
         addScreen(PrepareMatchScreen.SCREEN, "start_sp", "开始(单人)");
+        addScreen(PrepareMatchScreen.SCREEN, "empty", "空");
+        addScreen(PrepareMatchScreen.SCREEN, "easy", "Easy");
+        addScreen(PrepareMatchScreen.SCREEN, "normal", "Normal");
+        addScreen(PrepareMatchScreen.SCREEN, "hard", "Hard");
+        addScreen(PrepareMatchScreen.SCREEN, "lunatic", "Lunatic");
     }
 }
